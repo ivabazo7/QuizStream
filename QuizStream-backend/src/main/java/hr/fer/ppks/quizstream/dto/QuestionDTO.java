@@ -1,0 +1,19 @@
+package hr.fer.ppks.quizstream.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class QuestionDTO {
+    private Long id;
+    private String text;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private List<AnswerOptionDTO> answerOptions;
+}

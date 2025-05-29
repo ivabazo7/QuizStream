@@ -1,0 +1,14 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  color: black;
+}
+
+nav > a {
+  color: #fff;
+}
+
+nav > a:hover {
+  color: #00000070;
+}
