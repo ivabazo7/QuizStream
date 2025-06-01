@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @NoArgsConstructor
@@ -25,16 +25,10 @@ public class AnswerOption {
     @Column(name = "is_correct", nullable = false)
     private boolean isCorrect;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
     private Question question;
 
-    @OneToMany(mappedBy = "answerOption", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<QuizResponse> quizResponses;
+    @OneToMany(mappedBy = "answerOption", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<QuizResponse> quizResponses = new ArrayList<>();
 }

@@ -18,18 +18,23 @@ function QuizModeratorPage() {
     setShowForm(false);
   };
 
-  useEffect(() => {
-    const fetchQuizzes = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/moderator/${moderatorId}/quiz`);
-        if (!response.ok) throw new Error('Failed to fetch quizzes');
-        const data = await response.json();
-        setQuizzes(data);
-      } catch (error) {
-        console.error('Error fetching quizzes:', error);
-      }
-    };
+  const handleQuizDeleted = (deletedQuizId: number) => {
+    setQuizzes(prev => prev.filter(q => q.id !== deletedQuizId));
+  };
 
+  const fetchQuizzes = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/moderator/${moderatorId}/quiz`);
+      if (!response.ok) throw new Error('Failed to fetch quizzes');
+      const data = await response.json();
+      setQuizzes(data);
+    } catch (error) {
+      console.error('Error fetching quizzes:', error);
+    }
+  };
+
+  // Dohvat kvizova za moderatora
+  useEffect(() => {
     if (moderatorId) {
       fetchQuizzes();
     }
@@ -53,6 +58,7 @@ function QuizModeratorPage() {
                 name={q.name}
                 description={q.description}
                 updatedAt={q.updatedAt}
+                onDelete={() => handleQuizDeleted(q.id)}
               />
             )
         )}

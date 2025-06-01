@@ -1,9 +1,10 @@
 package hr.fer.ppks.quizstream.websocket;
 
+import hr.fer.ppks.quizstream.service.QuizStateService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.*;
 
@@ -17,14 +18,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class QuizWebSocketEventListener {
 
-    private final SimpMessagingTemplate messagingTemplate;
+    @Autowired
+    private QuizStateService quizStateService;
 
     private final Map<String, Set<String>> participantSessions = new ConcurrentHashMap<>();
     private final Map<String, String> moderatorSessions = new ConcurrentHashMap<>();
-
-    public QuizWebSocketEventListener(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
-    }
 
     @EventListener
     public void handleSessionSubscribe(SessionSubscribeEvent event) {
@@ -35,16 +33,16 @@ public class QuizWebSocketEventListener {
         // /topic/quiz/{quizCode}/*
         if (destination != null) {
             String quizCode = extractQuizCode(destination);
-            if (destination.contains("/participants")) {
+            if (destination.contains("/moderatorState")) {
                 // obrada moderatora
                 moderatorSessions.put(sessionId, quizCode);
                 log.info("Moderator {} subscribed to quiz {}", sessionId, quizCode);
                 // slanje trenutnog broja sudionika
                 sendParticipantCount(quizCode);
-            } else if (destination.contains("/question")){
+            } else if (destination.contains("/participantState")){
                 // obrada sudionika
                 participantSessions.computeIfAbsent(quizCode, k -> ConcurrentHashMap.newKeySet()).add(sessionId);
-                log.info("Session {} subscribed to quiz {}", sessionId, quizCode);
+                log.info("Participant {} subscribed to quiz {}", sessionId, quizCode);
                 // slanje trenutnog broja sudionika
                 sendParticipantCount(quizCode);
             }
@@ -64,32 +62,28 @@ public class QuizWebSocketEventListener {
         // odspajanje sudionika
         participantSessions.forEach((quizCode, sessions) -> {
             if (sessions.remove(sessionId)) {
-                log.info("Session {} disconnected from quiz {}", sessionId, quizCode);
+                log.info("Participant {} disconnected from quiz {}", sessionId, quizCode);
                 sendParticipantCount(quizCode);
             }
         });
     }
 
     /**
-     * Slanje broja sudionika moderatoru.
-     * @param quizCode
+     * Metoda za ažuriranje broja sudionka, odnosno stanja.
+     * @param quizCode kod kviza
      */
     private void sendParticipantCount(String quizCode) {
         int count = participantSessions.getOrDefault(quizCode, Collections.emptySet()).size();
-        messagingTemplate.convertAndSend("/topic/quiz/" + quizCode + "/participants", count);
-    }
-
-    private String extractQuizCode(String destination) {
-        String[] parts = destination.split("/");
-        return parts[3]; // /topic/quiz/{quizCode}/*
+        quizStateService.updateParticipantCount(quizCode, count);
     }
 
     /**
-     * Metoda za dohvat broja sudionika.
-     * @param quizCode
+     * Metoda za izdvajanje koda kviza
+     * @param destination destination path
      * @return
      */
-    public int getParticipantCount(String quizCode) {
-        return participantSessions.getOrDefault(quizCode, Collections.emptySet()).size();
+    private String extractQuizCode(String destination) {
+        String[] parts = destination.split("/");
+        return parts[3]; // /topic/quiz/{quizCode}/*
     }
 }

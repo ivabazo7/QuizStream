@@ -2,7 +2,7 @@ import { Divider, Flex, Input, Typography, message } from 'antd';
 import type { GetProps } from 'antd';
 import GradientButton from '../components/ui/GradientButton';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 type OTPProps = GetProps<typeof Input.OTP>;
 const { Title } = Typography;
@@ -13,12 +13,11 @@ function HomePage() {
   const navigate = useNavigate();
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-  const onInput: OTPProps['onInput'] = value => {
+  const onInput: OTPProps['onInput'] = (value: any[]) => {
     setQuizCode(value.join(''));
   };
 
   const handleJoinQuiz = async () => {
-    console.log('Clicked ' + quizCode);
     if (!quizCode || quizCode.length != 6) {
       message.error('Please insert a valid 6-character quiz code!');
       return;
@@ -63,7 +62,7 @@ function HomePage() {
       <Flex gap="small" align="center" vertical>
         <Title level={5}>Insert Code to Join Quiz:</Title>
         <Input.OTP
-          formatter={str => str.toUpperCase()}
+          formatter={(str: string) => str.toUpperCase()}
           length={6}
           separator={<span>-</span>}
           style={{ lineHeight: '8px' }}
@@ -78,7 +77,7 @@ function HomePage() {
       </Flex>
       <Divider plain>Or</Divider>
       <Flex gap="small" align="center" vertical>
-        SignIn ili QR code
+        <Link to="/login">Login</Link>
       </Flex>
     </Flex>
   );

@@ -1,5 +1,6 @@
 package hr.fer.ppks.quizstream.controller;
 
+import hr.fer.ppks.quizstream.dto.ModeratorDTO;
 import hr.fer.ppks.quizstream.model.Moderator;
 import hr.fer.ppks.quizstream.repository.ModeratorRepository;
 import lombok.Data;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,24 +32,24 @@ public class AuthController {
         moderator.setCreatedAt(LocalDateTime.now());
         Moderator savedModerator = moderatorRepository.save(moderator);
 
-        // Spremi u session
-        //session.setAttribute("user", savedModerator);
-        savedModerator.setPassword(null); // Sakrij lozinku u odgovoru
-        return ResponseEntity.ok(savedModerator);
+        ModeratorDTO moderatorDTO = new ModeratorDTO(savedModerator);
+        return ResponseEntity.ok(moderatorDTO);
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        Moderator moderator = moderatorRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Korisnik nije pronađen"));
+        Optional<Moderator> optModerator = moderatorRepository.findByEmail(request.getEmail());
+        if (optModerator.isEmpty()) {
+            return ResponseEntity.badRequest().body("Pogreška prijave");
+        }
+        Moderator moderator = optModerator.get();
 
         if (!request.getPassword().equals(moderator.getPassword())) {
-            return ResponseEntity.badRequest().body("Pogrešna lozinka");
+            return ResponseEntity.badRequest().body("Pogreška prijave.");
         }
 
-        //session.setAttribute("user", moderator);
-        moderator.setPassword(null); // Sakrij lozinku u odgovoru
-        return ResponseEntity.ok(moderator);
+        ModeratorDTO moderatorDTO = new ModeratorDTO(moderator);
+        return ResponseEntity.ok(moderatorDTO);
     }
 
     @Data

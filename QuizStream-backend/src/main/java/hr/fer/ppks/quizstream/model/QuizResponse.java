@@ -23,11 +23,11 @@ public class QuizResponse {
     @Column(name = "participant_ids", columnDefinition = "jsonb")
     private List<String> participantIds;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quiz_instance_id", nullable = false)
     private QuizInstance quizInstance;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "answer_option_id", nullable = false)
     private AnswerOption answerOption;
 }

@@ -21,10 +21,8 @@ function PageLayout() {
 
   const contentStyle: React.CSSProperties = {
     textAlign: 'center',
-    //minHeight: 120,
     lineHeight: '120px',
     color: '#fff',
-    //backgroundColor: '#fffffe',
   };
 
   const navStyle: React.CSSProperties = {

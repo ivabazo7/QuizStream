@@ -1,6 +1,7 @@
 import { JSX } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, useParams } from 'react-router-dom';
+import { Spin } from 'antd';
 
 interface ProtectedRouteProps {
   children: JSX.Element;
@@ -11,7 +12,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { moderatorId } = useParams<{ moderatorId: string }>();
 
   if (loading) {
-    return <div>Učitavanje...</div>;
+    return <Spin></Spin>;
   }
 
   if (!user) {

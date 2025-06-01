@@ -20,7 +20,7 @@ public class QuizInstanceController {
         return ResponseEntity.ok(new QuizCodeResponse(instance.getCode()));
     }
 
-    @PostMapping("/{quizCode}/end")
+    @PutMapping("/{quizCode}/end")
     public ResponseEntity<Void> endQuizInstanceByCode(@PathVariable String quizCode) {
         quizInstanceService.endInstanceByCode(quizCode);
         return ResponseEntity.ok().build();

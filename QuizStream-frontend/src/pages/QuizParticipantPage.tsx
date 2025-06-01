@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AnswerResultStat, ParticipantAnswers, Question } from '../types/quiz';
+import { AnswerResultStat, ParticipantAnswers, ParticipantState, Question } from '../types/quiz';
 import { Button, message, Spin } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
@@ -13,15 +13,34 @@ function QuizParticipantPage() {
   const navigate = useNavigate();
 
   const [question, setQuestion] = useState<Question | null>(null);
-  const [participantAnswer, setAnswer] = useState<ParticipantAnswers | null>(null);
+  const [participantAnswer, setParticipantAnswer] = useState<ParticipantAnswers | null>(null);
   const [isValidQuiz, setIsValidQuiz] = useState<boolean | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
-  const [resultsStat, setResultsStat] = useState<AnswerResultStat[]>([]);
+  const [resultsStat, setResultsStat] = useState<AnswerResultStat[] | null>(null);
   const [showStat, setShowStat] = useState(false);
 
   const stompClientRef = useRef<Client | null>(null);
 
-  // čišćenje pohrane prethodnih kvizova
+  const handleStateMessage = (msg: any) => {
+    const state: ParticipantState = JSON.parse(msg.body);
+
+    if (state.currentQuestion !== null) {
+      setQuestion(state.currentQuestion);
+      const hasVotedKey = `quiz_${quizCode}_question_${state.currentQuestion.id}`;
+      const hasVoted = localStorage.getItem(hasVotedKey) === 'true';
+      if (hasVoted) {
+        setHasAnswered(true);
+        setParticipantAnswer(null);
+      } else {
+        localStorage.setItem(hasVotedKey, 'false');
+        setHasAnswered(false);
+      }
+    }
+    setShowStat(state.showResults);
+    setResultsStat(state.resultsStat);
+  };
+
+  // Čišćenje pohrane prethodnih kvizova
   useEffect(() => {
     if (!quizCode) return;
     Object.keys(localStorage).forEach(key => {
@@ -31,33 +50,10 @@ function QuizParticipantPage() {
     });
   }, [quizCode]);
 
-  useEffect(() => {
-    if (!quizCode || !question) return;
-
-    // Očisti prethodne odgovore
-    setAnswer(null);
-
-    // Provjeri je li sudionik već glasao za trenutno pitanje
-    const hasVotedKey = `quiz_${quizCode}_question_${question.id}`;
-    const hasVoted = localStorage.getItem(hasVotedKey) === 'true';
-
-    if (hasVoted) {
-      setHasAnswered(true);
-
-      // Zatraži rezultate ako su dostupni
-      if (stompClientRef.current?.connected) {
-        stompClientRef.current.publish({
-          destination: `/app/quiz/${quizCode}/getResults`,
-          body: question.id,
-        });
-      }
-    }
-  }, [question, quizCode]);
-
+  // Provjera valjanosti koda kviza prije spajanja
   useEffect(() => {
     if (!quizCode) return;
 
-    // Provjeri valjanost kviza prije spajanja
     const validateQuizCode = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/quiz-instance/validate-code/${quizCode}`);
@@ -81,6 +77,7 @@ function QuizParticipantPage() {
     validateQuizCode();
   }, [quizCode]);
 
+  // Spajanje na WebSocket koristeći valjani kod kviza
   useEffect(() => {
     if (!quizCode || !isValidQuiz || stompClientRef.current?.connected) return;
 
@@ -91,22 +88,6 @@ function QuizParticipantPage() {
       onConnect: () => {
         console.log('Connected to WebSocket');
 
-        // Pretplata na trenutno pitanje
-        client.subscribe(`/topic/quiz/${quizCode}/question`, msg => {
-          const newQuestion: Question = JSON.parse(msg.body);
-          setQuestion(newQuestion);
-          setHasAnswered(false); // resetira status za novo pitanje
-          setResultsStat([]);
-          setShowStat(false);
-        });
-
-        // Pretplata na rezultate
-        client.subscribe(`/topic/quiz/${quizCode}/finalResults`, message => {
-          const parsedResults: AnswerResultStat[] = JSON.parse(message.body);
-          setResultsStat(parsedResults);
-          setShowStat(true);
-        });
-
         // Pretplata na kraj kviza
         client.subscribe(`/topic/quiz/${quizCode}/end`, _msg => {
           if (stompClientRef.current) {
@@ -114,30 +95,18 @@ function QuizParticipantPage() {
             console.log('WebSocket disconnected.');
           }
           setQuestion(null);
-          setAnswer(null);
+          setParticipantAnswer(null);
           setIsValidQuiz(null);
           setHasAnswered(false);
           navigate('/');
         });
 
         // Pretplata na trenutno stanje
-        client.subscribe(`/topic/quiz/${quizCode}/state`, msg => {
-          const state = JSON.parse(msg.body);
-          if (state.currentQuestion) {
-            setQuestion(state.currentQuestion);
-          }
-          if (state.showResults) {
-            // Zatraži rezultate ako su dostupni
-            client.publish({
-              destination: `/app/quiz/${quizCode}/getResults`,
-              body: state.currentQuestion?.id || '',
-            });
-          }
-        });
+        client.subscribe(`/topic/quiz/${quizCode}/participantState`, handleStateMessage);
 
-        // Zatraži trenutno stanje
+        // Dohvat trenutnog stanja
         client.publish({
-          destination: `/app/quiz/${quizCode}/getState`, // trigera /state
+          destination: `/app/quiz/${quizCode}/getParticipantState`, // trigera state
           body: JSON.stringify({}),
         });
       },
@@ -165,14 +134,14 @@ function QuizParticipantPage() {
 
     if (!participantAnswer || participantAnswer.questionId !== question.id) {
       // Ako nema odgovora ili je za drugo pitanje
-      setAnswer({
+      setParticipantAnswer({
         questionId: question.id,
         answerIds: [answerId],
       });
     } else {
       // Ako postoji već za isto pitanje
       const alreadySelected = participantAnswer.answerIds.includes(answerId);
-      setAnswer({
+      setParticipantAnswer({
         ...participantAnswer,
         answerIds: alreadySelected
           ? participantAnswer.answerIds.filter(id => id !== answerId)
@@ -184,6 +153,7 @@ function QuizParticipantPage() {
   const sendAnswer = () => {
     if (!participantAnswer || !stompClientRef.current?.connected) return;
 
+    // Slanje odgovora
     stompClientRef.current.publish({
       destination: `/app/quiz/${quizCode}/answer`,
       body: JSON.stringify(participantAnswer),
@@ -196,10 +166,6 @@ function QuizParticipantPage() {
     setHasAnswered(true); // Spriječi ponovni odgovor
     message.success('Hvala na odgovoru! Čekajte sljedeće pitanje...');
   };
-
-  if (isValidQuiz === false) {
-    return null; // Već smo preusmjerili na home page
-  }
 
   return (
     <>

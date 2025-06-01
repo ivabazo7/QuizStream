@@ -7,8 +7,8 @@ function RegisterPage() {
   const navigate = useNavigate();
 
   const onFinish = async (values: { username: string; email: string; password: string }) => {
-    await register(values.username, values.email, values.password);
-    navigate('/');
+    const userData = await register(values.username, values.email, values.password);
+    navigate(`/${userData?.id}/quiz`);
   };
 
   return (

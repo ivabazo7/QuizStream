@@ -11,10 +11,9 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User | null>;
+  register: (username: string, email: string, password: string) => Promise<User | null>;
   logout: () => void;
-  //fetchUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,7 +29,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (storedUser) {
           setUser(JSON.parse(storedUser));
         }
-        //await fetchUser();
       } catch (error) {
         console.error('Failed to fetch user', error);
       } finally {
@@ -41,25 +39,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, []);
 
-  /*
-  const fetchUser = async () => {
-    try {
-      const response = await api.get('/api/auth/current-user');
-      if (response.data.id) {
-        const userData = {
-          id: response.data.id,
-          username: response.data.username,
-          email: response.data.email,
-        };
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-      }
-    } catch (error) {
-      logout();
-    }
-  };
-  */
-
   const login = async (email: string, password: string) => {
     const response = await api.post('/auth/login', { email, password });
     const userData = {
@@ -69,7 +48,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
-    message.success('Uspješno prijavljeni!');
+    message.success('Login successful!');
+
+    return userData;
   };
 
   const register = async (username: string, email: string, password: string) => {
@@ -81,20 +62,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
-    message.success('Registracija uspješna!');
+    message.success('Registration successful!');
+
+    return userData;
   };
 
   const logout = async () => {
-    /*
-    try {
-      await api.post('/api/auth/logout');
-    } catch (error) {
-      console.error('Logout error', error);
-    }
-    */
     setUser(null);
     localStorage.removeItem('user');
-    message.success('Odjavljeni ste');
+    message.success('Logout successful');
   };
 
   return (

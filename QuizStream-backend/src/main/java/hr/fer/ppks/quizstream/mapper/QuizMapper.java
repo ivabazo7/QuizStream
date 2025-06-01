@@ -43,7 +43,7 @@ public class QuizMapper {
         quiz.setCreatedAt(currentTimestamp);
         quiz.setUpdatedAt(currentTimestamp);
         List<Question> questions = quizDTO.getQuestions().stream()
-                .map(qDto -> QuestionMapper.toEntity(qDto, currentTimestamp, quiz)).toList();
+                .map(qDto -> QuestionMapper.toEntity(qDto, quiz)).toList();
         quiz.setQuestions(questions);
         return quiz;
     }

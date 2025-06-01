@@ -13,6 +13,4 @@ public class AnswerOptionDTO {
     private Long id;
     private String text;
     private boolean isCorrect;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

@@ -15,6 +15,7 @@
     "@types/sockjs-client": "^1.5.4",
     "antd": "^5.24.9",
     "antd-style": "^3.7.1",
+    "axios": "^1.9.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.5.3",

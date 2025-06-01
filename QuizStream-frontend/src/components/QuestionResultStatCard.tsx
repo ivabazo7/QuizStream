@@ -1,4 +1,4 @@
-import { Card, List } from 'antd';
+import { Card, List, Spin } from 'antd';
 import Title from 'antd/es/typography/Title';
 import { Answer, AnswerResultStat } from '../types/quiz';
 
@@ -6,7 +6,7 @@ type Props = {
   quizName?: string;
   questionText: string;
   questionAnswerOptions: Answer[];
-  resultsStat: AnswerResultStat[];
+  resultsStat: AnswerResultStat[] | null;
 };
 
 function QuestionResultStatCard({
@@ -15,7 +15,9 @@ function QuestionResultStatCard({
   questionAnswerOptions,
   resultsStat,
 }: Props) {
-  if (!resultsStat || resultsStat.length === 0) return;
+  if (resultsStat === undefined || resultsStat === null || resultsStat.length === 0) {
+    return <Spin></Spin>;
+  }
 
   return (
     <Card title="Rezultati" style={{ marginTop: '1rem' }}>

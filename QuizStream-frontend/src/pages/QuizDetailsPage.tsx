@@ -1,8 +1,8 @@
 import { useParams } from 'react-router-dom';
 import QuizCreateEditForm from '../components/QuizCreateEditForm';
 import { useEffect, useRef, useState } from 'react';
-import { AnswerResultStat, Quiz } from '../types/quiz';
-import { Button, Typography } from 'antd';
+import { AnswerResultStat, ModeratorState, Quiz } from '../types/quiz';
+import { Button, Spin, Typography } from 'antd';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import QuestionResultStatCard from '../components/QuestionResultStatCard';
@@ -20,93 +20,25 @@ function QuizDetailsPage() {
   const [participantCount, setParticipantCount] = useState<number>(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResults, setShowResults] = useState(false);
-  const [resultsStat, setResultsStat] = useState<AnswerResultStat[]>([]);
+  const [resultsStat, setResultsStat] = useState<AnswerResultStat[] | null>(null);
 
   const stompClientRef = useRef<Client | null>(null);
 
-  const getTempResults = (questionIdx: string) => {
-    if (stompClientRef.current?.connected && quizCode) {
-      // Zatraži rezultate za trenutno pitanje
-      stompClientRef.current.publish({
-        destination: `/app/quiz/${quizCode}/getTempResults`,
-        body: questionIdx,
-      });
-    }
-  };
-
   const handleStateMessage = (message: any) => {
-    const state = JSON.parse(message.body);
-    setParticipantCount(state.participantCount);
-    if (state.currentQuestionIndex > currentQuestionIndex) {
-      setCurrentQuestionIndex(state.currentQuestionIndex);
-    } else {
+    const state: ModeratorState = JSON.parse(message.body);
+    if (state.participantCount != participantCount) {
+      setParticipantCount(state.participantCount);
     }
-    setResultsStat(state.resultsStat || []);
-    setShowResults(state.showResults || false);
+    if (state.currentQuestionIndex != currentQuestionIndex) {
+      setCurrentQuestionIndex(state.currentQuestionIndex);
+    }
+    setResultsStat(state.resultsStat); // AnswerResultStat[]
+    if (state.showResults != showResults) {
+      setShowResults(state.showResults);
+    }
   };
 
-  const handleShowResultsMessage = (message: any) => {
-    console.log('/showResults', message);
-    const parsedResults: AnswerResultStat[] = JSON.parse(message.body);
-    console.log(parsedResults);
-    setResultsStat(parsedResults);
-  };
-
-  const handleParticipantsMessage = (message: any) => {
-    const count = parseInt(message.body);
-    console.log(`Received participant count update: ${count}`);
-    setParticipantCount(count);
-  };
-
-  const handleFinalResultsMessage = (message: any) => {
-    const results: AnswerResultStat[] = JSON.parse(message.body);
-    setResultsStat(results);
-  };
-
-  // Prikupi stanje nakon spajanja
-  useEffect(() => {
-    if (!stompClientRef.current?.connected || !quizCode) return;
-
-    const stateSub = stompClientRef.current.subscribe(
-      `/topic/quiz/${quizCode}/state`,
-      handleStateMessage
-    );
-
-    // Zatraži trenutno stanje
-    stompClientRef.current.publish({
-      destination: `/app/quiz/${quizCode}/getState`, // trigera state
-      body: JSON.stringify({}),
-    });
-
-    return () => {
-      if (stompClientRef.current?.connected) {
-        stateSub.unsubscribe();
-      }
-    };
-  }, [quizCode]);
-
-  // Prikazi rezultate ako su dostupni
-  useEffect(() => {
-    if (!stompClientRef.current?.connected || !quizCode || !quiz || !showResults) return;
-
-    const question = quiz.questions[currentQuestionIndex - 1];
-    if (!question) return;
-
-    const finalResultsSub = stompClientRef.current.subscribe(
-      `/topic/quiz/${quizCode}/finalResults`,
-      handleFinalResultsMessage
-    );
-
-    // Zatraži rezultate za trenutno pitanje
-    getTempResults(question.id);
-
-    return () => {
-      if (stompClientRef.current?.connected) {
-        finalResultsSub.unsubscribe();
-      }
-    };
-  }, [quizCode, showResults, currentQuestionIndex, quiz]);
-
+  // Dohvat kviza
   useEffect(() => {
     const fetchQuiz = async () => {
       const response = await fetch(`${API_BASE_URL}/quiz/${quizId}`);
@@ -120,7 +52,13 @@ function QuizDetailsPage() {
     }
   }, [quizId]);
 
-  const connectToWebSocket = () => {
+  const connectToWebSocket = (isRefresh: boolean) => {
+    const storedCode = localStorage.getItem('quizCode');
+    if (isRefresh && !storedCode) {
+      // ako se dogodio refresh, a nema pohranjenog koda, ne spajaj se
+      return;
+    }
+    // inače se spoji ili sa pohranjenim kodom ako postoji ili kreiraj kod
     const socket = new SockJS(`${API_BASE_URL}/stomp-endpoint`);
     const client = new Client({
       webSocketFactory: () => socket,
@@ -129,20 +67,27 @@ function QuizDetailsPage() {
         console.log('Moderator connected to WebSocket');
 
         try {
-          const response = await fetch(`${API_BASE_URL}/quiz-instance/${quizId}/start`, {
-            method: 'POST',
-          });
-          const data = await response.json();
-          setQuizCode(data.quizCode);
-          localStorage.setItem('quizCode', data.quizCode);
+          let code;
 
-          client.subscribe(`/topic/quiz/${data.quizCode}/participants`, handleParticipantsMessage);
-          client.subscribe(`/topic/quiz/${data.quizCode}/showResults`, handleShowResultsMessage);
-          client.subscribe(`/topic/quiz/${data.quizCode}/state`, handleStateMessage);
+          if (storedCode) {
+            setQuizCode(storedCode);
+            code = storedCode;
+          } else {
+            const response = await fetch(`${API_BASE_URL}/quiz-instance/${quizId}/start`, {
+              method: 'POST',
+            });
+            const data = await response.json();
+            setQuizCode(data.quizCode);
+            localStorage.setItem('quizCode', data.quizCode);
+            code = data.quizCode;
+          }
 
-          // Traži trenutno stanje, koje su u /state postavi
+          // Pretplata na stanje
+          client.subscribe(`/topic/quiz/${code}/moderatorState`, handleStateMessage);
+
+          // Dohvat stanja
           client.publish({
-            destination: `/app/quiz/${data.quizCode}/getState`, // trigera state
+            destination: `/app/quiz/${code}/getModeratorState`, // trigera moderatorState
             body: JSON.stringify({}),
           });
         } catch (error) {
@@ -165,66 +110,29 @@ function QuizDetailsPage() {
   };
 
   useEffect(() => {
-    const storedCode = localStorage.getItem('quizCode');
-    if (storedCode) {
-      setQuizCode(storedCode);
-
-      const socket = new SockJS(`${API_BASE_URL}/stomp-endpoint`);
-      const client = new Client({
-        webSocketFactory: () => socket,
-        reconnectDelay: 5000,
-        onConnect: () => {
-          console.log('Reconnected to WebSocket with existing quiz code');
-
-          client.subscribe(`/topic/quiz/${storedCode}/participants`, handleParticipantsMessage);
-          client.subscribe(`/topic/quiz/${storedCode}/showResults`, handleShowResultsMessage);
-          client.subscribe(`/topic/quiz/${storedCode}/state`, handleStateMessage);
-
-          // Traži trenutno stanje, koje su u /state postavi
-          client.publish({
-            destination: `/app/quiz/${storedCode}/getState`, // trigera state
-            body: JSON.stringify({}),
-          });
-        },
-      });
-
-      client.activate();
-      stompClientRef.current = client;
-
-      return () => {
-        if (client.connected) {
-          client.deactivate();
-        }
-      };
-    }
+    // ponovno spajanje na WebSocket ako se dogodi refresh stranice
+    connectToWebSocket(true);
   }, []);
 
   const startQuestion = () => {
-    console.log('start');
     if (!stompClientRef.current?.connected || !quizCode || !quiz) {
-      console.log('return');
       return;
     }
 
     const question = quiz.questions[currentQuestionIndex];
     if (!question) {
-      console.log('no question');
       return;
     }
 
+    // Objava novog pitanja
     stompClientRef.current.publish({
       destination: `/app/quiz/${quizCode}/question`,
       body: JSON.stringify(question),
     });
 
-    // Zatraži rezultate za trenutno pitanje
-    getTempResults(question.id);
-
-    // Uvećaj index pitanja za sljedeći put
     setCurrentQuestionIndex(prev => prev + 1);
     setShowResults(false);
     setResultsStat([]);
-    console.log('started');
   };
 
   const showVotingResults = () => {
@@ -232,10 +140,10 @@ function QuizDetailsPage() {
     const question = quiz.questions[currentQuestionIndex - 1];
     if (!question) return;
 
-    // Prikaži rezultate i sudionicima
+    // Objava da se rezultati trebaju prikazati
     stompClientRef.current.publish({
-      destination: `/app/quiz/${quizCode}/finalResults`,
-      body: JSON.stringify(question.id),
+      destination: `/app/quiz/${quizCode}/showResults`,
+      body: JSON.stringify({}),
     });
 
     setShowResults(true);
@@ -258,8 +166,9 @@ function QuizDetailsPage() {
     }
 
     try {
+      // Označi instancu kviza neaktivnom
       const response = await fetch(`${API_BASE_URL}/quiz-instance/${quizCode}/end`, {
-        method: 'POST',
+        method: 'PUT',
       });
 
       if (!response.ok) throw new Error('Failed to end quiz instance.');
@@ -269,6 +178,7 @@ function QuizDetailsPage() {
       localStorage.removeItem('quizCode');
       setCurrentQuestionIndex(0);
       setResultsStat([]);
+
       if (stompClientRef.current) {
         stompClientRef.current.deactivate();
         console.log('WebSocket disconnected.');
@@ -278,7 +188,7 @@ function QuizDetailsPage() {
     }
   };
 
-  if (!quiz) return <p>Loading...</p>;
+  if (!quiz) return <Spin></Spin>;
 
   return (
     <div style={{ padding: '2rem' }}>
@@ -290,7 +200,7 @@ function QuizDetailsPage() {
         ) : (
           <Button
             type="primary"
-            onClick={connectToWebSocket}
+            onClick={() => connectToWebSocket(false)}
             disabled={!quiz?.questions || quiz.questions.length === 0}
           >
             Start Quiz
@@ -306,7 +216,7 @@ function QuizDetailsPage() {
               )}
 
             {(showResults || currentQuestionIndex === 0) &&
-              currentQuestionIndex < quiz.questions.length && ( // ako je true, gumb se peiakzuje i postavlja na false
+              currentQuestionIndex < quiz.questions.length && ( // ako je true, gumb se prikazuje i postavlja na false
                 <Button
                   type="primary"
                   onClick={startQuestion}
@@ -336,7 +246,7 @@ function QuizDetailsPage() {
       {stompClientRef.current?.connected &&
         quizCode &&
         quiz &&
-        currentQuestionIndex > 0 && ( // ovo je live statistika, te krajnja statistika i točan odgovor
+        currentQuestionIndex > 0 && ( // live statistika glasanja
           <QuestionResultStatCard
             quizName={quiz.name}
             questionText={quiz.questions[currentQuestionIndex - 1]?.text}

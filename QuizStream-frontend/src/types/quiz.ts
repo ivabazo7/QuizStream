@@ -19,16 +19,12 @@ export type Answer = {
   id: string;
   text: string;
   correct: boolean;
-  createdAt: Date;
-  updatedAt: Date;
 };
 
 export type Question = {
   id: string;
   text: string;
   answerOptions: Answer[];
-  createdAt: Date;
-  updatedAt: Date;
 };
 
 export type Quiz = {
@@ -47,7 +43,20 @@ export type ParticipantAnswers = {
 
 export type AnswerResultStat = {
   answerId: string;
+  correct?: boolean;
   count: number;
   percentage: number;
-  correct?: boolean;
+};
+
+export type ModeratorState = {
+  currentQuestionIndex: number;
+  participantCount: number;
+  showResults: boolean;
+  resultsStat: AnswerResultStat[] | null;
+};
+
+export type ParticipantState = {
+  currentQuestion: Question;
+  showResults: boolean;
+  resultsStat: AnswerResultStat[] | null;
 };

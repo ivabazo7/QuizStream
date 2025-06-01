@@ -10,9 +10,10 @@ type QuizCardProps = {
   name: string;
   description: string | undefined;
   updatedAt: Date;
+  onDelete(): void;
 };
 
-function QuizCard({ moderatorId, quizId, name, description, updatedAt }: QuizCardProps) {
+function QuizCard({ moderatorId, quizId, name, description, updatedAt, onDelete }: QuizCardProps) {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const navigate = useNavigate();
 
@@ -22,9 +23,15 @@ function QuizCard({ moderatorId, quizId, name, description, updatedAt }: QuizCar
 
   const handleDelete = async () => {
     try {
-      fetch(`${API_BASE_URL}/quiz/${quizId}`, {
+      const response = await fetch(`${API_BASE_URL}/quiz/${quizId}`, {
         method: 'DELETE',
       });
+
+      if (response.ok) {
+        onDelete();
+      } else {
+        console.error('Delete error:', await response.text());
+      }
     } catch (error) {
       console.error('Delete error:', error);
     }
@@ -42,7 +49,6 @@ function QuizCard({ moderatorId, quizId, name, description, updatedAt }: QuizCar
           onConfirm={e => {
             e?.stopPropagation();
             handleDelete();
-            window.location.reload();
           }}
           onCancel={e => e?.stopPropagation()}
           okText="Yes"

@@ -9,8 +9,9 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class QuestionDTO {
-    private Long id;
-    private String text;
-    private List<AnswerOptionDTO> answerOptions;
+public class ModeratorStateDTO {
+    private int currentQuestionIndex;
+    private int participantCount;
+    private boolean showResults;
+    private List<AnswerCorrectResultDTO> resultsStat;
 }

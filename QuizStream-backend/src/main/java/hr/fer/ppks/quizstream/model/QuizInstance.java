@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @NoArgsConstructor
@@ -28,10 +29,10 @@ public class QuizInstance {
     @Column(name = "end_timestamp", nullable = true)
     private LocalDateTime endTimestamp;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "quiz_id", nullable = false)
     private Quiz quiz;
 
-    @OneToMany(mappedBy = "quizInstance", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<QuizResponse> quizResponses;
+    @OneToMany(mappedBy = "quizInstance", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<QuizResponse> quizResponses = new ArrayList<>();
 }

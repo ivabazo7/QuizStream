@@ -7,8 +7,8 @@ function LoginPage() {
   const navigate = useNavigate();
 
   const onFinish = async (values: { email: string; password: string }) => {
-    await login(values.email, values.password);
-    navigate('/');
+    const userData = await login(values.email, values.password);
+    navigate(`/${userData?.id}/quiz`);
   };
 
   return (
